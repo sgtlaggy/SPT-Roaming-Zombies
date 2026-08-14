@@ -1,30 +1,33 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Helpers;
+using SPTarkov.Server.Core.Helpers.Server;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Spt.Mod;
+using SPTarkov.Server.Core.Models.Spt.Tables;
 using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
 using SPTarkov.Server.Core.Utils;
 using SPTarkov.Server.Web;
 
 namespace ZombieHorde;
 
-public record ZombieHordeMetadata : AbstractModMetadata, IModWebMetadata
+// SPT 4.1 replaced AbstractModMetadata + IModWebMetadata with a single IModMetadata
+// interface. IsBundleMod is gone; HasPrepatcher is new (unrelated to this mod).
+public record ZombieHordeMetadata : IModMetadata
 {
-    public override string ModGuid { get; init; } = "com.vonbraunz.roamingzombies";
-    public override string Name { get; init; } = "Roaming Zombies";
-    public override string Author { get; init; } = "DrBraun";
-    public override List<string>? Contributors { get; init; }
-    public override SemanticVersioning.Version Version { get; init; } = new("1.2.1");
-    public override SemanticVersioning.Range SptVersion { get; init; } = new("~4.0.13");
-    public override List<string>? Incompatibilities { get; init; }
-    public override Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
-    public override string? Url { get; init; }
-    public override bool? IsBundleMod { get; init; } = false;
-    public override string License { get; init; } = "MIT";
+    public string ModGuid { get; init; } = "com.vonbraunz.roamingzombies";
+    public string Name { get; init; } = "Roaming Zombies";
+    public string Author { get; init; } = "DrBraun";
+    public List<string>? Contributors { get; init; }
+    public SemanticVersioning.Version Version { get; init; } = new("1.2.1");
+    public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.2");
+    public bool HasPrepatcher { get; init; } = false;
+    public List<string>? Incompatibilities { get; init; }
+    public Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
+    public string? Url { get; init; }
+    public string License { get; init; } = "MIT";
 }
 
 /// <summary>
@@ -34,7 +37,7 @@ public record ZombieHordeMetadata : AbstractModMetadata, IModWebMetadata
 [Injectable(InjectionType = InjectionType.Singleton)]
 public class ZombieSpawnService(
     ISptLogger<ZombieSpawnService> logger,
-    DatabaseService databaseService,
+    LocationTable locationTable,
     RandomUtil randomUtil)
 {
     public static readonly Dictionary<string, string> MapZones = new()
@@ -76,8 +79,7 @@ public class ZombieSpawnService(
             return;
         }
 
-        var locations = databaseService.GetLocations();
-        var locationDict = locations.GetDictionary();
+        var locationDict = locationTable.GetDictionary();
         var totalMaps = 0;
 
         foreach (var (map, zone) in MapZones)
@@ -95,7 +97,7 @@ public class ZombieSpawnService(
                     continue;
             }
 
-            var actualKey = locations.GetMappedKey(map);
+            var actualKey = locationTable.GetMappedKey(map);
             if (!locationDict.TryGetValue(actualKey, out var location))
                 continue;
 
@@ -180,16 +182,20 @@ public class ZombieSpawnService(
 
 /// <summary>
 /// IOnLoad — loads config and does the initial spawn injection.
-/// Priority > BPS (PostDBModLoader + 69420) so we run after BPS's startup wipe.
+/// SPT 4.1 removed the old OnLoadOrder.PostDBModLoader stage as part of the
+/// Config/Database-server removal; PostLoad (the last defined stage) is the closest
+/// equivalent for "run once everything, including other mods' DB edits, is loaded".
+/// The +70000 offset mirrors the old BPS-relative ordering — re-verify against BPS's
+/// own 4.1 priority once that mod updates.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostDBModLoader + 70000)]
+[Injectable(TypePriority = OnLoadOrder.PostLoad + 70000)]
 public class ZombieHordeServer(
     ISptLogger<ZombieHordeServer> logger,
     ZombieSpawnService spawnService,
     ModHelper modHelper,
     JsonUtil jsonUtil) : IOnLoad
 {
-    public async Task OnLoad()
+    public async Task OnLoadAsync(CancellationToken cancellationToken)
     {
         var modPath  = modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly());
         var config   = await jsonUtil.DeserializeFromFileAsync<ZombieHordeConfig>(Path.Combine(modPath, "config.json"));
@@ -219,7 +225,7 @@ public class ZombieHordeRouter(ZombieSpawnService spawnService, JsonUtil jsonUti
         [
             new RouteAction(
                 "/client/match/local/end",
-                async (url, info, sessionId, output) =>
+                async (url, info, sessionId, output, cancellationToken) =>
                 {
                     spawnService.InjectSpawns();
                     return output;
