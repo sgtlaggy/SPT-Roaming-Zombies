@@ -7,6 +7,7 @@ using SPTarkov.Server.Core.Helpers.Server;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Spt.Mod;
 using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Server.Core.Services.Server;
 using SPTarkov.Server.Core.Utils;
 
 namespace ZombieHorde;
@@ -35,6 +36,7 @@ public record ZombieHordeMetadata : IModMetadata
 [Injectable(InjectionType = InjectionType.Singleton)]
 public class ZombieSpawnService(
     ISptLogger<ZombieSpawnService> logger,
+    SeasonalEventService seasonalEventService,
     LocationTable locationTable,
     RandomUtil randomUtil)
 {
@@ -76,6 +78,9 @@ public class ZombieSpawnService(
             logger.Warning("[RoamingZombies] InjectSpawns called before config was loaded — skipping");
             return;
         }
+
+        if (!seasonalEventService.HalloweenEventEnabled())
+            return;
 
         var locationDict = locationTable.GetDictionary();
         var totalMaps = 0;

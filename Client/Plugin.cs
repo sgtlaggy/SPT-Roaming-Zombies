@@ -1,6 +1,8 @@
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using Comfort.Common;
+using EFT;
 using ZombieHorde.Client.Patches;
 
 namespace ZombieHorde.Client
@@ -19,6 +21,11 @@ namespace ZombieHorde.Client
             Log = Logger;
 
             BindConfig();
+
+            var seasonConfig = Singleton<GlobalConfiguration>.Instance.SeasonActivityConfig;
+
+            if (!seasonConfig.InfectionHalloweenConfig.Enabled)
+                return;
 
             new RaidStartPatch().Enable();
             new InfectedSidePatch().Enable();
