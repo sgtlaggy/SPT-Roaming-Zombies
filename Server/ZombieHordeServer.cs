@@ -7,9 +7,7 @@ using SPTarkov.Server.Core.Helpers.Server;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Spt.Mod;
 using SPTarkov.Server.Core.Models.Spt.Tables;
-using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.Server.Core.Utils;
-using SPTarkov.Server.Web;
 
 namespace ZombieHorde;
 
@@ -21,7 +19,7 @@ public record ZombieHordeMetadata : IModMetadata
     public string Name { get; init; } = "Roaming Zombies";
     public string Author { get; init; } = "DrBraun";
     public List<string>? Contributors { get; init; }
-    public SemanticVersioning.Version Version { get; init; } = new("1.2.1");
+    public SemanticVersioning.Version Version { get; init; } = new("1.3.0");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.2");
     public bool HasPrepatcher { get; init; } = false;
     public List<string>? Incompatibilities { get; init; }
@@ -135,7 +133,7 @@ public class ZombieSpawnService(
                         DependKarmaPVE       = false,
                         ForceSpawn           = _config.AlwaysSpawn,
                         IgnoreMaxBots        = _config.IgnoreMaxBots,
-                        SpawnMode            = null,
+                        SpawnMode            = [],
                         Supports             = null!,
                         Time                 = waveTime,
                         TriggerId            = "",
@@ -163,7 +161,7 @@ public class ZombieSpawnService(
                             DependKarmaPVE       = false,
                             ForceSpawn           = _config.AlwaysSpawn,
                             IgnoreMaxBots        = _config.IgnoreMaxBots,
-                            SpawnMode            = null,
+                            SpawnMode            = [],
                             Supports             = null!,
                             Time                 = waveTime,
                             TriggerId            = "",
@@ -219,7 +217,7 @@ public class ZombieHordeServer(
 /// second, after the wipe, and puts the zombies back.
 /// </summary>
 [Injectable]
-public class ZombieHordeRouter(ZombieSpawnService spawnService, JsonUtil jsonUtil)
+public class ZombieHordeRouter(ZombieSpawnService spawnService, JsonUtil jsonUtil, HttpResponseUtil httpResponseUtil)
     : StaticRouter(
         jsonUtil,
         [
@@ -228,7 +226,7 @@ public class ZombieHordeRouter(ZombieSpawnService spawnService, JsonUtil jsonUti
                 async (url, info, sessionId, output, cancellationToken) =>
                 {
                     spawnService.InjectSpawns();
-                    return output;
+                    return output ?? httpResponseUtil.NullResponse();
                 })
         ])
 { }

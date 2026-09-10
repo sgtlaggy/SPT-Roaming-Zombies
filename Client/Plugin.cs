@@ -5,7 +5,7 @@ using ZombieHorde.Client.Patches;
 
 namespace ZombieHorde.Client
 {
-    [BepInPlugin("com.vonbraunz.roamingzombies", "Roaming Zombies", "1.2.1")]
+    [BepInPlugin("com.vonbraunz.roamingzombies", "Roaming Zombies", "1.3.0")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log;

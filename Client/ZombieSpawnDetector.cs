@@ -389,7 +389,7 @@ namespace ZombieHorde.Client
 
             if (Plugin.EnableHordeNotification.Value)
             {
-                NotificationManagerClass.DisplayMessageNotification(
+                NotificationManager.DisplayMessageNotification(
                     "The dead are rising... zombies have been spotted nearby.",
                     ENotificationDurationType.Long);
             }
